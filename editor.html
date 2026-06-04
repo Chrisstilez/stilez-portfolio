@@ -51,6 +51,46 @@ small.note{display:block;font-size:11.5px;color:#a1a1aa;margin-top:4px;}
 </style>
 </head>
 <body>
+<div id="authgate" style="position:fixed;inset:0;z-index:99999;background:#0b0b0c;display:flex;align-items:center;justify-content:center;font:15px/1.5 system-ui,-apple-system,sans-serif;color:#eee;">
+  <div style="width:320px;max-width:90vw;text-align:center;">
+    <h2 style="font-weight:700;margin:0 0 4px;">Portfolio Editor</h2>
+    <p id="authmsg" style="color:#9aa;margin:0 0 16px;">Enter your password</p>
+    <input id="authpw" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#161618;color:#fff;font-size:15px;">
+    <input id="authpw2" type="password" autocomplete="new-password" placeholder="Confirm password" style="display:none;width:100%;box-sizing:border-box;margin-top:8px;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#161618;color:#fff;font-size:15px;">
+    <button id="authbtn" style="width:100%;margin-top:12px;padding:10px;border:0;border-radius:8px;background:#fff;color:#111;font-weight:600;font-size:15px;cursor:pointer;">Unlock</button>
+    <p id="autherr" style="color:#e66;min-height:18px;margin:10px 0 0;font-size:13px;"></p>
+  </div>
+</div>
+<script>
+(function(){
+  /* Optional: paste a SHA-256 hex hash here to enforce one password on ALL devices/visitors.
+     If left empty, each browser sets its own password on first visit. */
+  const BAKED_PW_HASH="";
+  const LS_KEY="editor_pw_hash";
+  const gate=document.getElementById('authgate');
+  if(sessionStorage.getItem('editor_authed')==='1'){ gate.remove(); return; }
+  const msg=document.getElementById('authmsg'),pw=document.getElementById('authpw'),pw2=document.getElementById('authpw2'),btn=document.getElementById('authbtn'),err=document.getElementById('autherr');
+  async function sha(s){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+  function stored(){ return BAKED_PW_HASH||localStorage.getItem(LS_KEY)||""; }
+  let mode=stored()?'login':'setup';
+  if(mode==='setup'){ msg.textContent='Create a password to protect this editor'; pw.placeholder='New password'; pw2.style.display='block'; btn.textContent='Set password'; }
+  setTimeout(()=>pw.focus(),50);
+  function unlock(){ sessionStorage.setItem('editor_authed','1'); gate.remove(); }
+  async function submit(){
+    err.textContent='';
+    if(mode==='setup'){
+      if(pw.value.length<4){ err.textContent='Use at least 4 characters.'; return; }
+      if(pw.value!==pw2.value){ err.textContent="Passwords don't match."; return; }
+      localStorage.setItem(LS_KEY,await sha(pw.value)); unlock();
+    } else {
+      if(await sha(pw.value)===stored()){ unlock(); }
+      else { err.textContent='Incorrect password.'; pw.value=''; pw.focus(); }
+    }
+  }
+  btn.onclick=submit;
+  [pw,pw2].forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter') submit(); }));
+})();
+</script>
 <header>
   <h1>Portfolio Editor</h1>
   <input type="file" id="loadfile" accept=".html" style="display:none">
