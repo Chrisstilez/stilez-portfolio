@@ -56,7 +56,10 @@ small.note{display:block;font-size:11.5px;color:#a1a1aa;margin-top:4px;}
   <input type="file" id="loadfile" accept=".html" style="display:none">
   <button class="btn" onclick="loadfile.click()">Open site file…</button>
   <button class="btn" onclick="openPreview()">Preview</button>
-  <button class="btn primary" onclick="downloadSite()">Download website</button>
+  <button class="btn" onclick="downloadSite()">Download website</button>
+  <button class="btn primary" onclick="publishToGitHub()">Publish to GitHub</button>
+  <button class="btn" onclick="resetGitHubToken()" title="Set or replace your GitHub token">GitHub setup</button>
+  <span id="ghstatus" style="margin-left:10px;font:13px/1.4 system-ui;color:#444;"></span>
 </header>
 <div class="wrap">
   <nav>
@@ -97,6 +100,44 @@ function downloadSite(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='portfolio.html';a.click();
 }
 function openPreview(){ pvframe.srcdoc=buildHTML(); pv.classList.add('show'); pvSize('100%','100%'); }
+
+/* ---------- publish straight to GitHub (auto-deploys) ---------- */
+const GH = { owner:'Chrisstilez', repo:'stilez-portfolio', path:'index.html', branch:'main' };
+function ghStatus(msg,color){ const s=document.getElementById('ghstatus'); if(s){ s.textContent=msg||''; s.style.color=color||'#444'; } }
+function getGitHubToken(){
+  let t=localStorage.getItem('gh_token');
+  if(!t){
+    t=prompt('Paste a GitHub token (fine-grained, repo "'+GH.repo+'", Contents: Read and write).\nIt is stored only in this browser.');
+    if(t){ t=t.trim(); localStorage.setItem('gh_token',t); }
+  }
+  return t;
+}
+function resetGitHubToken(){
+  const cur=localStorage.getItem('gh_token')||'';
+  const t=prompt('Paste your GitHub token (stored only in this browser). Leave blank to remove it.',cur);
+  if(t===null) return;
+  if(t.trim()){ localStorage.setItem('gh_token',t.trim()); ghStatus('Token saved.','#127a2e'); }
+  else { localStorage.removeItem('gh_token'); ghStatus('Token removed.','#a33'); }
+}
+async function publishToGitHub(){
+  const token=getGitHubToken();
+  if(!token){ ghStatus('No token set.','#a33'); return; }
+  const html=buildHTML();
+  const api='https://api.github.com/repos/'+GH.owner+'/'+GH.repo;
+  const H={ 'Authorization':'Bearer '+token, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' };
+  const call=async(url,opts)=>{ const r=await fetch(api+url,opts); if(r.status===401){ localStorage.removeItem('gh_token'); throw new Error('Unauthorized — token rejected. Click "GitHub setup" to paste a valid token.'); } if(!r.ok) throw new Error(url+' → '+r.status+' '+(await r.text())); return r.json(); };
+  try{
+    ghStatus('Publishing…','#444');
+    const ref=await call('/git/ref/heads/'+GH.branch,{headers:H});
+    const baseSha=ref.object.sha;
+    const baseCommit=await call('/git/commits/'+baseSha,{headers:H});
+    const blob=await call('/git/blobs',{method:'POST',headers:H,body:JSON.stringify({content:html,encoding:'utf-8'})});
+    const tree=await call('/git/trees',{method:'POST',headers:H,body:JSON.stringify({base_tree:baseCommit.tree.sha,tree:[{path:GH.path,mode:'100644',type:'blob',sha:blob.sha}]})});
+    const commit=await call('/git/commits',{method:'POST',headers:H,body:JSON.stringify({message:'Update site via editor — '+new Date().toISOString(),tree:tree.sha,parents:[baseSha]})});
+    await call('/git/refs/heads/'+GH.branch,{method:'PATCH',headers:H,body:JSON.stringify({sha:commit.sha})});
+    ghStatus('Published ✓ — your site will redeploy shortly.','#127a2e');
+  }catch(err){ ghStatus('Publish failed: '+err.message,'#a33'); alert('Publish failed:\n'+err.message); }
+}
 function pvSize(w,h){ pvframe.style.width=w; pvframe.style.maxWidth='100%'; pvframe.style.height='95%'; }
 
 /* ---------- load an existing site (import content only) ---------- */
