@@ -65,7 +65,7 @@ small.note{display:block;font-size:11.5px;color:#a1a1aa;margin-top:4px;}
 (function(){
   /* Optional: paste a SHA-256 hex hash here to enforce one password on ALL devices/visitors.
      If left empty, each browser sets its own password on first visit. */
-  const BAKED_PW_HASH="";
+  const BAKED_PW_HASH="0f80f3cd540ce03b639e29fde0eee0e97ba1d526c7dda6f947ee3bf491676595";
   const LS_KEY="editor_pw_hash";
   const gate=document.getElementById('authgate');
   if(sessionStorage.getItem('editor_authed')==='1'){ gate.remove(); return; }
