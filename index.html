@@ -57,14 +57,16 @@ html[data-theme="dark"]{
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
 body{font-family:var(--font);color:var(--ink);overflow:hidden;background:#171717;-webkit-font-smoothing:antialiased;user-select:none;}
-#wallpaper{position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;}
+#wallpaper{position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;transform:scale(1.08);will-change:transform;animation:wallDrift 42s ease-in-out infinite;}
+@keyframes wallDrift{0%{transform:scale(1.08) translate(0,0)}50%{transform:scale(1.14) translate(-1.6%,-1.1%)}100%{transform:scale(1.08) translate(0,0)}}
 
 /* ── MENU BAR ────────────────────────────────────────────────────── */
 #menubar{
   position:fixed;top:0;left:0;right:0;height:34px;z-index:40;
   display:flex;align-items:center;gap:20px;padding:0 18px;
-  font-size:13px;color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.6);background:transparent;
+  font-size:13px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55),0 1px 10px rgba(0,0,0,.45);background:transparent;
 }
+#menubar:not(.glass)::before{content:"";position:absolute;left:0;right:0;top:0;height:46px;background:linear-gradient(180deg,rgba(0,0,0,.42),rgba(0,0,0,0));pointer-events:none;z-index:-1;}
 #menubar.glass{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.18);text-shadow:0 1px 3px rgba(0,0,0,.35);}
 body.bar-none #menubar{display:none;}
 body.bar-none{--dtop:0px;--gtop:16px;}
@@ -224,7 +226,7 @@ if(barStyle==='glass') document.getElementById('menubar').classList.add('glass')
 document.getElementById('menubar').innerHTML =
   `<span class="brand">${DATA.name||'Portfolio'}</span>`+
   (DATA.menu||[]).map((m,i)=>`<span class="mlink" onclick="menuClick(window._menu[${i}])">${m.label}</span>`).join('')+
-  `<span class="sp"></span><span class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Switch light / dark mode">☾</span><span class="clock" id="clock"></span>`;
+  `<span class="sp"></span><span class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Switch light / dark mode">☾&#xFE0E;</span><span class="clock" id="clock"></span>`;
 
 /* light / dark theme: follow system by default, with manual override */
 (function(){
@@ -233,7 +235,7 @@ document.getElementById('menubar').innerHTML =
   const sys=()=>mq.matches?'dark':'light';
   window.applyTheme=function(t){
     document.documentElement.setAttribute('data-theme',t);
-    const b=document.getElementById('themeBtn'); if(b) b.textContent=(t==='dark'?'☀':'☾');
+    const b=document.getElementById('themeBtn'); if(b) b.textContent=(t==='dark'?'☀︎':'☾︎');
   };
   window.toggleTheme=function(){
     const cur=document.documentElement.getAttribute('data-theme')||sys();
@@ -244,10 +246,26 @@ document.getElementById('menubar').innerHTML =
   mq.addEventListener('change',e=>{ if(!localStorage.getItem(KEY)) applyTheme(e.matches?'dark':'light'); });
 })();
 
-/* desktop icons */
-document.getElementById('desktop').innerHTML = DATA.projects.map((p,i)=>`
-  <div class="icon" style="left:${p.x}%;top:${p.y}%;animation-delay:${i*0.05}s" onclick="openProject(${i})">
-    <div class="thumb" style="background-image:${thumbBg(p.thumb||p.cover,i)}"></div><div class="lbl">${p.title}</div></div>`).join('');
+/* desktop icons — deterministic centered grid (desktop layout; mobile uses CSS grid) */
+(function(){
+  const N=DATA.projects.length;
+  const cols=Math.min(Math.max(1,Math.ceil(Math.sqrt(N))),4);
+  const rows=Math.ceil(N/cols);
+  const X0=20,X1=80,Y0=(rows>1?30:50),Y1=70;
+  const step=cols>1?(X1-X0)/(cols-1):0;
+  function gpos(i){
+    const row=Math.floor(i/cols);
+    const inRow=(row<rows-1)?cols:(N-cols*(rows-1));
+    const col=i-row*cols;
+    const x=(inRow<=1)?50:((50-step*(inRow-1)/2)+step*col);
+    const y=(rows>1)?(Y0+(Y1-Y0)*(row/(rows-1))):50;
+    return {x:x.toFixed(2),y:y.toFixed(2)};
+  }
+  document.getElementById('desktop').innerHTML = DATA.projects.map((p,i)=>{
+    const g=gpos(i);
+    return `<div class="icon" style="left:${g.x}%;top:${g.y}%;animation-delay:${i*0.05}s" onclick="openProject(${i})"><div class="thumb" style="background-image:${thumbBg(p.thumb||p.cover,i)}"></div><div class="lbl">${p.title}</div></div>`;
+  }).join('');
+})();
 
 /* dock */
 const ic={
